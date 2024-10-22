@@ -662,3 +662,254 @@ public static void batchAndBufferModern() {
 ## References
 - `1.` **Understanding the Main Java I/O Concepts** in [**dev.java**](https://dev.java/learn/java-io/intro/).
 - `2.` **File Operations Basics** in [**dev.java**](https://dev.java/learn/java-io/reading-writing/).
+
+## 2. Character Streams
+
+### 2.1. Charset
+
+> This repo is used in this Youtube video: https://youtu.be/Jdk39lBJ_hY
+
+Follow the [**Java Documentation**](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/charset/Charset.html)**:**
+> A **charset** is defined as the combination of
+> **one or more coded character sets** and **a character-encoding scheme.**
+
+> A **coded character set** is a mapping between _a set of abstract characters_ and _a set of integers_. 
+> `US-ASCII`, `ISO 8859-1`, `JIS X 0201`, and `Unicode` are examples of coded character sets.
+
+👉 In `Unicode` version 16, there are **154,998** _characters(a set of characters)_ ([FAQ from unicode.org](https://www.unicode.org/faq/basic_q.html))
+are assigned to _code points(a set of integers)_. For example, [**English characters, Japanese characters and Emoji**](https://en.wikipedia.org/wiki/List_of_Unicode_characters) in `Unicode`:
+```text
+Code Point    <->   Character   Description
+U+0041         |    A           Latin Capital letter A (https://symbl.cc/en/0041/)                
+U+0042         |    B           Latin Capital letter B (https://symbl.cc/en/0042/)
+...            |
+U+005A         |    Z           Latin Capital letter Z (https://symbl.cc/en/005A/)
+...            |
+U+5301         |    匁          Ideograph Japanese unit of weight (1/1000 of a kan) CJK 匁 (https://symbl.cc/en/5301/)
+...            |
+U+1F525        |    🔥          Fire Emoji (https://symbl.cc/en/1F525-fire-emoji/)
+```
+
+> **A character-encoding scheme** is a mapping between one or more **coded character sets** and a set of octet (eight-bit **byte) sequences**. 
+> `UTF-8`, `UTF-16`, `ISO 2022`, and `EUC` are examples of character-encoding schemes. Let's take `UTF-8` as example:
+```text
+Character   Code Point    <->   Bytes(Hex)
+A           U+0041         |    41                  (https://symbl.cc/en/0041/)
+B           U+0042         |    42                  (https://symbl.cc/en/0042/)
+...                        |
+Z           U+005A         |    5A                  (https://symbl.cc/en/005A/)
+...                        |
+匁          U+5301         |    E5 8C 81            (https://symbl.cc/en/5301/)
+...                        |
+🔥          U+1F525        |    F0 9F 94 A5         (https://symbl.cc/en/1F525-fire-emoji/)
+```
+> **Noted:** `UTF-8` is **variable-length** encoding scheme, it means that 1 code point could be encoded to 1,2,3 or 4 bytes depend on the code point
+
+> **Encoding schemes** are often associated with a particular **coded character set**; 
+> `UTF-8`(encoding scheme), for example, is used only to encode `Unicode`(character set).
+> Look at the table above, we used `UTF-8` to encode `Unicode` **code points** to **byte sequences**.
+
+👉 If we use `UTF-8` as an encoding scheme, the resource MUST be `Unicode` compatible.
+
+> **Noted:** Some schemes, however, are associated with multiple coded character sets; `EUC`, for example, can be used to encode characters in a variety of Asian coded character sets.
+
+> When a **coded character set** is used **_exclusively_** with a single **character-encoding scheme** 
+> then the corresponding **charset** is usually named for the **coded character set**; otherwise a **charset** is usually named for the **encoding scheme**.
+> 
+> 👉 `UTF-8` **character-encoding schemes** is used to encode `Unicode` **coded character set** only
+> 👉 The **charset** name for `UTF-8` **character-encoding schemes** and `Unicode` **coded character set** is the **character-encoding schemes**: `UTF-8`.
+> 
+> 👉 **In Java,** this **charset** is represented as  `StandardCharsets.UTF_8`. So `StandardCharsets.UTF_8` is a combination of `Unicode` **coded character set** and `UTF-8` **character-encoding schemes**.
+
+Similar to `StandardCharsets.UTF_8`, In **Java**, we can look at some others well-known **charset** at  `java.nio.charset.StandardCharsets`
+```java
+public final class StandardCharsets {
+
+    //...
+
+    /**
+     * Seven-bit ASCII, also known as ISO646-US, also known as the
+     * Basic Latin block of the Unicode character set.
+     */
+    public static final Charset US_ASCII = sun.nio.cs.US_ASCII.INSTANCE;
+
+    /**
+     * ISO Latin Alphabet {@literal No. 1}, also known as ISO-LATIN-1.
+     */
+    public static final Charset ISO_8859_1 = sun.nio.cs.ISO_8859_1.INSTANCE;
+
+    /**
+     * Eight-bit UCS Transformation Format.
+     */
+    public static final Charset UTF_8 = sun.nio.cs.UTF_8.INSTANCE;
+
+    /**
+     * Sixteen-bit UCS Transformation Format, big-endian byte order.
+     */
+    public static final Charset UTF_16BE = new sun.nio.cs.UTF_16BE();
+
+    /**
+     * Sixteen-bit UCS Transformation Format, little-endian byte order.
+     */
+    public static final Charset UTF_16LE = new sun.nio.cs.UTF_16LE();
+
+    /**
+     * Sixteen-bit UCS Transformation Format, byte order identified by an
+     * optional byte-order mark.
+     */
+    public static final Charset UTF_16 = new sun.nio.cs.UTF_16();
+}
+```
+Or we can create from `Charset#forName`
+```java
+Charset charset = Charset.forName("UTF-8");
+```
+
+### Let's do an experiment to prove the concept
+
+**In Java,** we can use `UTF-8` **charset** to encode a `String`(not `char`) to `byte[]`
+```java
+String emoji = "🔥";
+byte[] emojiBytes = emoji.getBytes(StandardCharsets.UTF_8);
+```
+and the other way around from `byte[]` to `String`(not `char`)
+```java
+String emoji = new String(emojiBytes, StandardCharsets.UTF_8);
+```
+
+🙋 **You might ask:** we're learning about mapping `Unicode characters` to `byte sequences` so far, why don't we use `char`?
+
+✅ Because `char` primitive type **in Java** is **NOT** equivalent to a `Unicode character`. `Unicode character` is equivalent to a `code point` as its definition.
+We can easily prove that by:
+```java
+String emoji = "🔥";
+int numOfChars = emoji.length(); // 2
+```
+We only have **1** `emoji character`, but it returns **2**, it's actually **the number** of `char`, this is equivalent to
+```java
+char[] array = emoji.toCharArray();
+int numOfArray = array.length; // 2
+```
+👉 **1** `emoji character` needs 2 `char`s. It's easy to understand because 1 `emoji` is encoded to **4 bytes** (32 bits)
+but in **Java**, `char` is only **2 bytes** (16 bits), thus, can only represent set of characters from `U+0000` to `U+FFFF` is sometimes referred to 
+as the Basic Multilingual Plane (BMP) - [**Character - Java Documentation**](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Character.html)
+
+💁 **How to get the number of `Unicode Characters` here?** - 🙋 **Counting the code points**
+```java
+String emoji = "🔥";
+long numOfCodePoints = emoji.codePoints().count(); // 1
+String s = "Z匁🔥";
+long numOfCodePointsInS = s.codePoints().count(); // 3
+```
+
+#### Good to Know 👇
+> **Noted:** If you dive more into `Unicode`, about `Unicode Normalization`, `character` can be ambiguous, you may want to use `Grapheme` - **a single unit of a human writing system**.
+One `Grapheme` may be represented as a single `code point` or a combination of many `code points`.
+> 
+> One `Grapheme` `Á` could be:
+> * `Á` -> `Á`(https://symbl.cc/en/00C1/)
+> * `Á` -> `A`(https://symbl.cc/en/0041/) + `́`(https://symbl.cc/en/0301/)
+```java
+List<String> list = Normalizer.normalize("Á", Normalizer.Form.NFD) // NFD: Canonical decomposition 
+        .codePoints()
+        .mapToObj(cp -> String.format("%02x", cp))
+        .toList(); // [41, 301]
+```
+
+🔥 **We just reviewed some knowledge about `Charset`, let's move on to process our file: `unicode_characters.txt` with it**.
+
+The file `unicode_characters.txt` contains `Z匁🔥`, includes 1 english character `Z`, 1 japanese character `匁` and 1 emoji `🔥`.
+
+👉 _We will run through the code below step by step:_
+```java
+public static void main(String[] args) throws IOException {
+    byte[] allBytesInFile = Files.readAllBytes(Path.of("unicode_characters.txt"));
+    System.out.println("Byte representation of the file contains: Z匁🔥");
+    printByte(allBytesInFile);
+
+    String english = "Z";
+    String japanese = "匁";
+    String emoji = "🔥";
+
+    System.out.println("Z U+%s (https://symbl.cc/en/005A/)".formatted(Integer.toHexString(english.codePointAt(0))));
+    byte[] englishBytes = english.getBytes(StandardCharsets.UTF_8);
+    printByte(englishBytes);
+
+    System.out.print("\t\t匁 U+%s (https://symbl.cc/en/5301/)\n\t\t".formatted(Integer.toHexString(japanese.codePointAt(0))));
+    byte[] japaneseBytes = japanese.getBytes(StandardCharsets.UTF_8);
+    printByte(japaneseBytes);
+
+    System.out.print("\t\t\t\t\t\t\t\t🔥 U+%s (https://symbl.cc/en/1F525-fire-emoji/)\n\t\t\t\t\t\t\t\t".formatted(Integer.toHexString(emoji.codePointAt(0))));
+    byte[] emojiBytes = emoji.getBytes(StandardCharsets.UTF_8);
+    printByte(emojiBytes);
+
+    System.out.println();
+    utf8DecodeByteByByte(allBytesInFile);
+    System.out.println();
+
+    byte[] englishB = Arrays.copyOfRange(allBytesInFile, 0, 1);
+    printByte(englishB);
+    System.out.println(new String(englishB, StandardCharsets.UTF_8));
+
+    byte[] japaneseB = Arrays.copyOfRange(allBytesInFile, 1, 4);
+    System.out.print("\t\t");
+    printByte(japaneseB);
+    System.out.println("\t\t%s".formatted(new String(japaneseB, StandardCharsets.UTF_8)));
+
+    byte[] emojiB = Arrays.copyOfRange(allBytesInFile, 4, 8);
+    System.out.print("\t\t\t\t\t\t\t\t");
+    printByte(emojiB);
+    System.out.println("\t\t\t\t\t\t\t\t%s".formatted(new String(emojiB, StandardCharsets.UTF_8)));
+
+    System.out.println();
+    System.out.println(new String(allBytesInFile, StandardCharsets.UTF_8));
+}
+
+public static void printByte(byte[] bytes) {
+    for (byte aByte : bytes) {
+        System.out.print(String.format("%02x", aByte));
+        System.out.print("\t|\t");
+    }
+    System.out.println();
+}
+
+public static void utf8DecodeByteByByte(byte[] bytes) {
+    for (byte aByte : bytes) {
+        String s = new String(new byte[]{aByte});
+        System.out.print(s);
+        System.out.print("\t|\t");
+    }
+    System.out.println();
+}
+```
+```java
+/* Legal UTF-8 Byte Sequences
+ *
+ * #    Code Points      Bits   Bit/Byte pattern
+ * 1                     7      0xxxxxxx
+ *      U+0000..U+007F          00..7F
+ *
+ * 2                     11     110xxxxx    10xxxxxx
+ *      U+0080..U+07FF          C2..DF      80..BF
+ *
+ * 3                     16     1110xxxx    10xxxxxx    10xxxxxx
+ *      U+0800..U+0FFF          E0          A0..BF      80..BF
+ *      U+1000..U+FFFF          E1..EF      80..BF      80..BF
+ *
+ * 4                     21     11110xxx    10xxxxxx    10xxxxxx    10xxxxxx
+ *     U+10000..U+3FFFF         F0          90..BF      80..BF      80..BF
+ *     U+40000..U+FFFFF         F1..F3      80..BF      80..BF      80..BF
+ *    U+100000..U10FFFF         F4          80..8F      80..BF      80..BF
+ *
+ */
+```
+
+> **Noted:** In **Java 17** and before, _the default charset_ was **the platform's default charset**. But in **Java 18**, it was set to **UTF-8**
+> as part of [**JEP 400: UTF-8 by Default**](https://openjdk.org/jeps/400). 
+> This means that **most Java APIs** will **use UTF-8 by default** for character encoding and decoding, _unless you explicitly specify a different charset_
+
+I'm using Java 21, `s.getBytes(StandardCharsets.UTF_8)` and `s.getBytes()` result in the same, _but it's always a good practice to explicitly specify
+the charset to ensure correct encoding and decoding._
+
+
+
